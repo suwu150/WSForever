@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<litepal>
+
+    <dbname value="WSForever" />
+
+    <version value="1" />
+
+    <list>
+        <mapping class="com.jkwu.wsforever.db.Province" />
+        <mapping class="com.jkwu.wsforever.db.City" />
+        <mapping class="com.jkwu.wsforever.db.County" />
+    </list>
+
+</litepal>

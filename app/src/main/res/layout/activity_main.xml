@@ -6,41 +6,161 @@
     android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     tools:context=".MainActivity">
-
-
-
-    <android.support.v7.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:popupTheme="@style/Theme.AppCompat.Light"
-        />
 
     <FrameLayout
         android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:fitsSystemWindows="true"
         android:layout_height="match_parent">
 
-        <com.baidu.mapapi.map.MapView
-            android:id="@+id/bmapView"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:focusable="true"
-            />
-    </FrameLayout>
+        <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:fitsSystemWindows="true"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" >
 
-    <TextView
+            <com.baidu.mapapi.map.MapView
+                android:id="@+id/bmapView"
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:layout_alignParentStart="true"
+                android:layout_alignParentTop="true"
+                android:layout_marginStart="0dp"
+                android:layout_marginTop="0dp"
+                android:clickable="true"
+                android:fitsSystemWindows="true" />
+
+
+            <LinearLayout
+                android:fitsSystemWindows="true"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="5dp"
+                android:background="#01000000"
+                android:minWidth="100dip"
+                android:orientation="vertical"
+                android:paddingRight="20dp"
+                android:paddingLeft="20dp" >
+
+                <include layout="@layout/title"
+                    android:layout_marginTop="0dip"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/planType"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_marginTop="80dip"
+                android:background="#3c000000"
+                android:minWidth="100dip"
+                android:fitsSystemWindows="true"
+                android:orientation="vertical"
+                android:padding="2dp" >
+
+                <RadioGroup
+                    android:id="@+id/radioGroupPlan"
+                    android:background="#11111111"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fitsSystemWindows="true"
+                    android:contentDescription="定位方式" >
+
+                    <RadioButton
+                        android:id="@+id/starsPlan"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:textSize="12sp"
+                        android:text="卫星图" >
+                    </RadioButton>
+
+                    <RadioButton
+                        android:id="@+id/twoDPlan"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="普通地图"
+                        android:textSize="11sp"></RadioButton>
+                    <RadioButton
+                        android:id="@+id/threeDPlan"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:textSize="11sp"
+                        android:text="3D俯视地图" >
+                    </RadioButton>
+                </RadioGroup>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/planType"
+                android:background="#3c000000"
+                android:minWidth="100dip"
+                android:layout_marginTop="5dp"
+                android:layout_alignParentRight="true"
+                android:fitsSystemWindows="true"
+                android:orientation="vertical"
+                android:padding="2dp" >
+
+
+                <CheckBox
+                    android:id="@+id/traffice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:textSize="11sp"
+                    android:onClick="setTraffic"
+                    android:text="路况图" />
+
+                <CheckBox
+                    android:id="@+id/baiduHeatMap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="false"
+                    android:textSize="11sp"
+                    android:onClick="setBaiduHeatMap"
+                    android:text="百度城市热力图" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_marginLeft="20dp"
+                android:layout_marginBottom="60dp"
+                android:background="#01000000"
+                android:minWidth="100dip"
+                android:orientation="vertical"
+                android:padding="2dp">
+
+                <include
+                    layout="@layout/bottom_location"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="0dp"
+                />
+            </LinearLayout>
+
+        </RelativeLayout>
+    </FrameLayout>
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="Hello World!"
-        android:layout_gravity="start"
-        android:background="#fff"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-
+        android:background="#FFF"
+        android:layout_gravity="start">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="hahahahha"
+            android:layout_gravity="start"
+            />
+    </RelativeLayout>
 </android.support.v4.widget.DrawerLayout>
