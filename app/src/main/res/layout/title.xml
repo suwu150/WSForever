@@ -13,11 +13,11 @@
 
     <Button
         android:id="@+id/user_setting"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="32dp"
+        android:layout_height="31dp"
         android:layout_marginLeft="5dp"
         android:layout_marginRight="5dp"
-        android:background="@drawable/user" />
+        android:background="@drawable/icon_c28" />
 
     <EditText
         android:background="@color/transparent"
@@ -27,26 +27,20 @@
         android:layout_weight="1"
         android:textColor="#000"
         android:singleLine="true"
+        android:imeOptions="actionSend"
         android:hint="查找地点、超市、公交"
         android:textSize="15sp"
         />
 
     <Button
-        android:id="@+id/search_button"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_marginRight="10dp"
-        android:layout_alignParentRight="true"
-        android:layout_centerVertical="true"
+        android:id="@+id/audio_button"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
         android:background="@drawable/voice_record_btn_normal" />
     <Button
         android:id="@+id/ar_scan"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_marginRight="10dp"
-        android:layout_alignParentRight="true"
-        android:layout_centerVertical="true"
-        android:visibility="gone"
-        android:background="@drawable/icon_markc" />
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:background="@drawable/scan" />
 
 </LinearLayout>

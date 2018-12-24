@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">WSForever</string>
+    <string name="title_activity_baidu_asrdigital_dialog">BaiduASRDigitalDialog</string>
 </resources>

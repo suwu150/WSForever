@@ -23,7 +23,15 @@ public class ChangePlanType {
     2D平面图
      */
     public void setTwoDPlan () {
+        /**
+         * 处理俯视 俯角范围： -45 ~ 0 , 单位： 度
+         */
+
         typeBaiduMap.setMapType(BaiduMap.MAP_TYPE_NORMAL);
+        int overlookAngle = Integer.parseInt("-10".toString());
+        MapStatus ms = new MapStatus.Builder(typeBaiduMap.getMapStatus()).overlook(overlookAngle).build();
+        MapStatusUpdate u = MapStatusUpdateFactory.newMapStatus(ms);
+        typeBaiduMap.animateMapStatus(u);
     }
 
     /*

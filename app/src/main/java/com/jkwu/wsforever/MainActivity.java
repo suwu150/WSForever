@@ -1,7 +1,7 @@
 package com.jkwu.wsforever;
 
 import android.Manifest;
-import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Sensor;
@@ -14,40 +14,51 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
-import com.baidu.location.BDLocationListener;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptor;
 import com.baidu.mapapi.map.BitmapDescriptorFactory;
-import com.baidu.mapapi.map.MapStatus;
 import com.baidu.mapapi.map.MapStatusUpdate;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
+import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.MyLocationConfiguration;
 import com.baidu.mapapi.map.MyLocationConfiguration.LocationMode;
 
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.map.UiSettings;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.search.core.SearchResult;
+import com.baidu.mapapi.search.geocode.GeoCodeOption;
+import com.baidu.mapapi.search.geocode.GeoCodeResult;
+import com.baidu.mapapi.search.geocode.GeoCoder;
+import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
+import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
+import com.baidu.speech.EventManagerFactory;
+import com.baidu.speech.EventManager;
+import com.baidu.speech.EventListener;
+import com.baidu.speech.asr.SpeechConstant;
 import com.jkwu.wsforever.biz.ChangePlanType;
 import com.jkwu.wsforever.biz.RequestLocation;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity implements SensorEventListener, OnGetGeoCoderResultListener {
 
         public LocationClient mLocationClient;
         private MapView mMapView = null;
@@ -64,33 +75,41 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         private  LocationMode mCurrentMode;
         private MyLocationData locationData;
 
+        // 传感器管理
         private SensorManager mSensorManager;
 
+        // 地理编码搜索
+        GeoCoder mSearch = null; // 搜索模块，也可去掉地图模块独立使用
 
         // UI相关
         RadioGroup.OnCheckedChangeListener radioButtonListener;
         private boolean isFirstLocate = true;
 
-        @Override
+        // 语音识别
+        EventManager asr = null;
+
+    @Override
         protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
 
-//            Toolbar toolbar = (Toolbar)findViewById(R.id.toolbar);
-//            setSupportActionBar(toolbar);
-            if (Build.VERSION.SDK_INT >= 21) {
-                View decorView = getWindow().getDecorView();
-                decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-                getWindow().setStatusBarColor(Color.TRANSPARENT);
-            }
-            mLocationClient = new LocationClient(getApplicationContext());
-            mLocationClient.registerLocationListener(new MyLocationListener());
+        if (Build.VERSION.SDK_INT >= 21) {
+            View decorView = getWindow().getDecorView();
+            decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+        }
+        mLocationClient = new LocationClient(getApplicationContext());
+        mLocationClient.registerLocationListener(new MyLocationListener());
 
 
-            initLocation();
+        initLocation();
+        setContentView(R.layout.activity_main);
+        checkSelfPermissions();
+        initActity();
 
-            setContentView(R.layout.activity_main);
+        }
 
+        private void initActity() {
             //获取地图控件引用
             mMapView = (MapView) findViewById(R.id.bmapView);
             baiduMap = mMapView.getMap();
@@ -108,6 +127,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             baiduMap.setTrafficEnabled(true);
             changePlanTypeRadioListener();
             requestLocListener();
+            setAudioListener();
+            setARScanListener();
+
+            // 初始化地理编码功能
+            // 初始化搜索模块，注册事件监听
+            initGeoCoder();
+            unFocusSearchListener();
 
             // 设置定位图层的配置（定位模式，是否允许方向信息，用户自定义定位图标）
 //            mCurrentMarker = BitmapDescriptorFactory
@@ -117,7 +143,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             //
             mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);//获取传感器管理服务
-            checkSelfPermissions();
         }
 
         private void checkSelfPermissions() {
@@ -131,11 +156,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if (isGrantedPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 permissionList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
             }
+            if (isGrantedPermission(Manifest.permission.RECORD_AUDIO)) {
+                permissionList.add(Manifest.permission.RECORD_AUDIO);
+            }
+            if (isGrantedPermission(Manifest.permission.ACCESS_NETWORK_STATE)) {
+                permissionList.add(Manifest.permission.ACCESS_NETWORK_STATE);
+            }
+            if (isGrantedPermission(Manifest.permission.INTERNET)) {
+                permissionList.add(Manifest.permission.INTERNET);
+            }
 
             Log.d("WSForver", permissionList.isEmpty() + "");
             if (!permissionList.isEmpty()) {
                 String [] permissions = permissionList.toArray(new String[permissionList.size()]);
-                ActivityCompat.requestPermissions(MainActivity.this, permissions, 1);
+                ActivityCompat.requestPermissions(this, permissions, 1);
             } else {
                 requestLocation();
             }
@@ -206,7 +240,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             mMapView.onDestroy();
         }
 
-
         @Override
         protected void onStop() {
             //取消注册传感器监听
@@ -239,7 +272,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 baiduMap.animateMapStatus(update);
                 isFirstLocate = false;
             }
-
 
             mCurrentLat = location.getLatitude();
             mCurrentLon = location.getLongitude();
@@ -281,7 +313,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             };
             groupPlan.setOnCheckedChangeListener(radioButtonListener);
-
         }
 
         private void requestLocListener() {
@@ -313,6 +344,242 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             requestLocButton.setOnClickListener(btnClickListener);
         }
 
+    private void setAudioListener() {
+        asr = EventManagerFactory.create(this, "asr");
+        final Button audioButton = (Button) findViewById(R.id.audio_button);
+
+        View.OnClickListener btnClickListener = new View.OnClickListener() {
+            public void onClick(View v) {
+                Log.d("audio", "开始语音识别");
+                EventListener audioListener = new EventListener() {
+                    @Override
+                    public void onEvent(String name, String params, byte [] data, int offset, int length) {
+                        if (data != null) {
+                            Log.d("输出结果：", data[offset + length] + "");
+                        };
+                        if(name.equals(SpeechConstant.CALLBACK_EVENT_ASR_READY)){
+                            // 引擎就绪，可以说话，一般在收到此事件后通过UI通知用户可以说话了
+                            Log.d("audio", name);
+
+                        }
+                        if(name.equals(SpeechConstant.CALLBACK_EVENT_ASR_FINISH)){
+                            // 识别结束
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        }
+                        if (SpeechConstant.CALLBACK_EVENT_WAKEUP_SUCCESS.equals(name)) {
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        }
+                        String currentJson = params;
+                        String logMessage = "name:" + name + "; params:" + params;
+
+                        if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_LOADED)) {
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_UNLOADED)) {
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_READY)) {
+                            // 引擎准备就绪，可以开始说话
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_BEGIN)) {
+                            // 检测到用户的已经开始说话
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_END)) {
+                            // 检测到用户的已经停止说话
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_PARTIAL)) {
+                            // 临时识别结果, 长语音模式需要从此消息中取出结果
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_FINISH)) {
+                            // 识别结束， 最终识别结果或可能的错误
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_LONG_SPEECH)) { // 长语音
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_EXIT)) {
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_VOLUME)) {
+                            // Logger.info(TAG, "asr volume event:" + params);
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_AUDIO)) {
+                            Log.d("audio", name);
+                            if (data != null) {
+                                Log.d("输出结果：", data[offset + length] + "");
+                            };
+                        }
+                        // ... 支持的输出事件和事件支持的事件参数见“输入和输出参数”一节
+                    }
+                };
+                asr.registerListener(audioListener);
+                String json ="{\"accept-audio-data\":false,\"disable-punctuation\":false,\"accept-audio-volume\":true,\"pid\":1736}";
+                asr.send(SpeechConstant.ASR_START, json, null, 0, 0);
+            }
+        };
+        audioButton.setOnClickListener(btnClickListener);
+    }
+
+    private void setARScanListener() {
+        final Button arscanButton = (Button) findViewById(R.id.ar_scan);
+        View.OnClickListener btnClickListener = new View.OnClickListener() {
+            public void onClick(View v) {
+                Log.d("arscanButton", "开始AR识别");
+            }
+        };
+        arscanButton.setOnClickListener(btnClickListener);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+//        running = false;
+//        Log.i(TAG, "requestCode" + requestCode);
+        if (requestCode == 2) {
+            String message = "对话框的识别结果：";
+            if (resultCode == RESULT_OK) {
+                ArrayList results = data.getStringArrayListExtra("results");
+                if (results != null && results.size() > 0) {
+                    message += results.get(0);
+                }
+            } else {
+                message += "没有结果";
+            }
+//            Log.i(TAG, "message" + message);
+        }
+
+    }
+
+    private void unFocusSearchListener() {
+        final EditText SearchContent = (EditText) findViewById(R.id.search_content);
+        SearchContent.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                //当actionId == XX_SEND 或者 XX_DONE时都触发
+                //或者event.getKeyCode == ENTER 且 event.getAction == ACTION_DOWN时也触发
+                //注意，这是一定要判断event != null。因为在某些输入法上会返回null。
+                if (actionId == EditorInfo.IME_ACTION_SEND
+                        || actionId == EditorInfo.IME_ACTION_DONE
+                        || (event != null && KeyEvent.KEYCODE_ENTER == event.getKeyCode() && KeyEvent.ACTION_DOWN == event.getAction())) {
+                    //处理事件
+                    mSearch.geocode(new GeoCodeOption()
+                            .city(SearchContent.getText().toString())
+                            .address(SearchContent.getText().toString()));
+                }
+                return false;
+            }
+        });
+
+        View.OnFocusChangeListener SearchContentChangeListener = new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (!hasFocus) {
+                    mSearch.geocode(new GeoCodeOption()
+                            .city(SearchContent.getText().toString())
+                            .address(SearchContent.getText().toString()));
+                }
+                mSearch.geocode(new GeoCodeOption()
+                        .city(SearchContent.getText().toString())
+                        .address(SearchContent.getText().toString()));
+
+//                if (v.getId() == R.id.reversegeocode) {
+//                    int version  = 0;
+////                    EditText lat = (EditText) findViewById(R.id.lat);
+////                    EditText lon = (EditText) findViewById(R.id.lon);
+////                    CheckBox cb = (CheckBox) findViewById(R.id.newVersion);
+//                    LatLng ptCenter = new LatLng((Float.valueOf(lat.getText().toString())), (Float.valueOf(lon.getText().toString())));
+//
+//                    // 反Geo搜索
+//                    if(cb.isChecked()){
+//                        version=1;
+//                    }
+//                    mSearch.reverseGeoCode(new ReverseGeoCodeOption().location(ptCenter).newVersion(version).radius(500));
+//                } else if (v.getId() == R.id.geocode) {
+//                    EditText editCity = (EditText) findViewById(R.id.city);
+//                    EditText editGeoCodeKey = (EditText) findViewById(R.id.geocodekey);
+//
+//                    // Geo搜索
+//                    mSearch.geocode(new GeoCodeOption()
+//                            .city(editCity.getText().toString())
+//                            .address(editGeoCodeKey.getText().toString()));
+//                }
+            }
+        };
+        SearchContent.setOnFocusChangeListener(SearchContentChangeListener);
+    }
+
+    private void initGeoCoder() {
+        mSearch = GeoCoder.newInstance();
+        mSearch.setOnGetGeoCodeResultListener(this);
+    }
+
+
+    @Override
+    public void onGetGeoCodeResult(GeoCodeResult result) {
+        if (result == null || result.error != SearchResult.ERRORNO.NO_ERROR) {
+            Toast.makeText(MainActivity.this, "抱歉，未能找到结果", Toast.LENGTH_LONG).show();
+            return;
+        }
+        baiduMap.clear();
+        baiduMap.addOverlay(new MarkerOptions()
+                .position(result.getLocation())
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_marka)));
+        baiduMap.setMapStatus(MapStatusUpdateFactory.newLatLng(result.getLocation()));
+        String strInfo = String.format("纬度：%f 经度：%f",
+                result.getLocation().latitude,
+                result.getLocation().longitude);
+        Toast.makeText(MainActivity.this, strInfo, Toast.LENGTH_LONG).show();
+        Log.e("GeoCodeDemo", "onGetGeoCodeResult = " + result.toString());
+    }
+
+    @Override
+    public void onGetReverseGeoCodeResult(ReverseGeoCodeResult result) {
+        if (result == null || result.error != SearchResult.ERRORNO.NO_ERROR) {
+            Toast.makeText(MainActivity.this, "抱歉，未能找到结果", Toast.LENGTH_LONG).show();
+            return;
+        }
+        baiduMap.clear();
+        baiduMap.addOverlay(new MarkerOptions()
+                .position(result.getLocation())
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_marka)));
+        baiduMap.setMapStatus(MapStatusUpdateFactory.newLatLng(result.getLocation()));
+        Toast.makeText(MainActivity.this, result.getAddress() + " adcode: " + result.getAdcode(), Toast.LENGTH_LONG).show();
+        Log.e("GeoCodeDemo", "ReverseGeoCodeResult = " + result.toString());
+    }
+
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         double x = sensorEvent.values[SensorManager.DATA_X];
@@ -331,7 +598,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /**
      * 设置是否显示交通图
-     *
      * @param view
      */
     public void setTraffic(View view) {
@@ -340,7 +606,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /**
      * 设置是否显示百度热力图
-     *
      * @param view
      */
     public void setBaiduHeatMap(View view) {
@@ -350,8 +615,49 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
-    public class MyLocationListener extends BDAbstractLocationListener {
+    /**
+     * 获取点击事件
+     */
+//    @Override
+//    public boolean dispatchTouchEvent(MotionEvent ev) {
+//        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+//            View view = getCurrentFocus();
+//            if (isHideInput(view, ev)) {
+//                HideSoftInput(view.getWindowToken());
+//                view.clearFocus();
+//            }
+//        }
+//        return super.dispatchTouchEvent(ev);
+//    }
 
+    /**
+     * 判定是否需要隐藏
+     */
+//    private boolean isHideInput(View v, MotionEvent ev) {
+//        if (v != null && (v instanceof EditText)) {
+//            int[] l = {0, 0};
+//            v.getLocationInWindow(l);
+//            int left = l[0], top = l[1], bottom = top + v.getHeight(), right = left + v.getWidth();
+//            if (ev.getX() > left && ev.getX() < right && ev.getY() > top && ev.getY() < bottom) {
+//                return false;
+//            } else {
+//                return true;
+//            }
+//        }
+//        return false;
+//    }
+
+    /**
+     * 隐藏软键盘
+     */
+//    private void HideSoftInput(IBinder token) {
+//        if (token != null) {
+//            InputMethodManager manager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+//            manager.hideSoftInputFromWindow(token, InputMethodManager.HIDE_NOT_ALWAYS);
+//        }
+//    }
+
+    public class MyLocationListener extends BDAbstractLocationListener {
             @Override
             public void onReceiveLocation(BDLocation bdLocation) {
                 Log.d("百度定位", bdLocation.getAddrStr());
