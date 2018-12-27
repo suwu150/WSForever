@@ -1,4 +1,19 @@
 <resources>
     <string name="app_name">WSForever</string>
     <string name="title_activity_baidu_asrdigital_dialog">BaiduASRDigitalDialog</string>
+
+    <string name="title_activity_recognition_listener_dialog">RecognitionListenerDialog</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="title_activity_scenery_ar">SceneryArActivity</string>
+    <string name="title_activity_building_ar">BuildingArActivity</string>
+
+
+    <string name="app_name_demo">android_arsdk</string>
+    <string name="app_operate">AR 景区 功能展示</string>
+    <string name="app_explore">AR 识楼 功能展示</string>
+    <string name="app_find">集成检索sdk展示发现周边功能</string>
+    <string name="app_custom">自定义单点数据</string>
+    <string name="app_custom_more">自定义多点数据</string>
+    <string name="title_activity_ar">ArActivity</string>
 </resources>

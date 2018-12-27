@@ -42,23 +42,47 @@ import com.baidu.mapapi.map.MyLocationConfiguration.LocationMode;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.map.UiSettings;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.search.core.CityInfo;
+import com.baidu.mapapi.search.core.PoiInfo;
 import com.baidu.mapapi.search.core.SearchResult;
 import com.baidu.mapapi.search.geocode.GeoCodeOption;
 import com.baidu.mapapi.search.geocode.GeoCodeResult;
 import com.baidu.mapapi.search.geocode.GeoCoder;
 import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
 import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
+import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener;
+import com.baidu.mapapi.search.poi.PoiDetailResult;
+import com.baidu.mapapi.search.poi.PoiDetailSearchResult;
+import com.baidu.mapapi.search.poi.PoiIndoorResult;
+import com.baidu.mapapi.search.poi.PoiNearbySearchOption;
+import com.baidu.mapapi.search.poi.PoiResult;
+import com.baidu.mapapi.search.poi.PoiSearch;
+import com.baidu.mapapi.search.poi.PoiSortType;
 import com.baidu.speech.EventManagerFactory;
 import com.baidu.speech.EventManager;
 import com.baidu.speech.EventListener;
 import com.baidu.speech.asr.SpeechConstant;
+import com.jkwu.wsforever.activity.ArActivity;
+import com.jkwu.wsforever.activity.BuildingArActivity;
+import com.jkwu.wsforever.activity.RecognitionListenerDialog;
+import com.jkwu.wsforever.activity.SceneryArActivity;
 import com.jkwu.wsforever.biz.ChangePlanType;
 import com.jkwu.wsforever.biz.RequestLocation;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener, OnGetGeoCoderResultListener {
+import map.baidu.ar.init.ArBuildingResponse;
+import map.baidu.ar.init.ArSceneryResponse;
+import map.baidu.ar.init.ArSdkManager;
+import map.baidu.ar.init.OnGetDataResultListener;
+import map.baidu.ar.model.ArInfoScenery;
+import map.baidu.ar.model.ArLatLng;
+import map.baidu.ar.model.ArPoiInfo;
+import map.baidu.ar.model.PoiInfoImpl;
+
+public class MainActivity extends AppCompatActivity implements SensorEventListener, OnGetGeoCoderResultListener, OnGetDataResultListener,
+        OnGetPoiSearchResultListener {
 
         public LocationClient mLocationClient;
         private MapView mMapView = null;
@@ -74,6 +98,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         private float mCurrentAccracy;
         private  LocationMode mCurrentMode;
         private MyLocationData locationData;
+        private BDLocation currentBDLocation;
+        private boolean isNotEmptyCurrentBDLocation = true;
 
         // 传感器管理
         private SensorManager mSensorManager;
@@ -87,6 +113,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         // 语音识别
         EventManager asr = null;
+
+        // AR识别
+        public static ArInfoScenery arInfoScenery; // 景区
+        public static ArBuildingResponse arBuildingResponse; // 识楼
+        public static List<PoiInfoImpl> poiInfos; // 探索
+        private PoiSearch mPoiSearch = null;
+        private ArSdkManager mArSdkManager = null;
+        private LatLng center = null;
+        int radius = 1000; // 500米半径
+        private int loadIndex = 0;
 
     @Override
         protected void onCreate(Bundle savedInstanceState) {
@@ -141,8 +177,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            MyLocationConfiguration config = new MyLocationConfiguration(mCurrentMode, true, mCurrentMarker);
 //            baiduMap.setMyLocationConfiguration(config);
 
-            //
+            // 系统传感器
             mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);//获取传感器管理服务
+
+            // AR
+            // 如果需要检索，初始化搜索模块，注册搜索事件监听
+            mPoiSearch = PoiSearch.newInstance();
+            mPoiSearch.setOnGetPoiSearchResultListener(this);
+            // 如果需要Ar景区功能、Ar识楼功能要注册监听
+            mArSdkManager = ArSdkManager.getInstance();
+            mArSdkManager.setOnGetDataResultListener(this);
         }
 
         private void checkSelfPermissions() {
@@ -164,6 +208,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             if (isGrantedPermission(Manifest.permission.INTERNET)) {
                 permissionList.add(Manifest.permission.INTERNET);
+            }
+            if (isGrantedPermission(Manifest.permission.CAMERA)) {
+                permissionList.add(Manifest.permission.CAMERA);
             }
 
             Log.d("WSForver", permissionList.isEmpty() + "");
@@ -219,6 +266,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             //如果设置为0，则代表单次定位，即仅定位一次，默认为0
             //如果设置非0，需设置1000ms以上才有效
             option.setIsNeedAddress(true);
+
+            //可选，默认false，设置是否需要位置语义化结果，可以在BDLocation.getLocationDescribe里得到，结果类似于“在北京天安门附近”
+            option.setIsNeedLocationDescribe(true);
+           //可选，默认false，设置是否需要POI结果，可以在BDLocation.getPoiList里得到
+            option.setIsNeedLocationPoiList(true);
 
 //            option.setEnableSimulateGps(true);
             //可选，设置是否需要过滤GPS仿真结果，默认需要，即参数为false
@@ -276,6 +328,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             mCurrentLat = location.getLatitude();
             mCurrentLon = location.getLongitude();
             mCurrentAccracy = location.getRadius();
+
+            currentBDLocation = location;
 
             // 构造定位数据
             locationData = new MyLocationData.Builder()
@@ -354,6 +408,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 EventListener audioListener = new EventListener() {
                     @Override
                     public void onEvent(String name, String params, byte [] data, int offset, int length) {
+                        Log.d("输出结果：params", params);
                         if (data != null) {
                             Log.d("输出结果：", data[offset + length] + "");
                         };
@@ -397,6 +452,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_BEGIN)) {
                             // 检测到用户的已经开始说话
                             Log.d("audio", name);
+                            Log.d("audio", data[offset + length] + "");
                             if (data != null) {
                                 Log.d("输出结果：", data[offset + length] + "");
                             };
@@ -404,6 +460,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_END)) {
                             // 检测到用户的已经停止说话
                             Log.d("audio", name);
+                            Log.d("audio", data[offset + length] + "");
                             if (data != null) {
                                 Log.d("输出结果：", data[offset + length] + "");
                             };
@@ -411,6 +468,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_PARTIAL)) {
                             // 临时识别结果, 长语音模式需要从此消息中取出结果
                             Log.d("audio", name);
+                            Log.d("audio", data[offset + length] + "");
                             if (data != null) {
                                 Log.d("输出结果：", data[offset + length] + "");
                             };
@@ -454,11 +512,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         audioButton.setOnClickListener(btnClickListener);
     }
 
+    /**
+     * 停止识别
+     */
+    public void stopASRSTOP() {
+        asr.send(SpeechConstant.ASR_STOP,null,null,0,0);
+    }
+
     private void setARScanListener() {
         final Button arscanButton = (Button) findViewById(R.id.ar_scan);
         View.OnClickListener btnClickListener = new View.OnClickListener() {
             public void onClick(View v) {
                 Log.d("arscanButton", "开始AR识别");
+//                mArSdkManager.searchSceneryInfo("2a7a25ecf9cf13636d3e1bad");
+//                mArSdkManager.searchBuildingInfo();
+                searchNearbyProcess();
             }
         };
         arscanButton.setOnClickListener(btnClickListener);
@@ -511,9 +579,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             .city(SearchContent.getText().toString())
                             .address(SearchContent.getText().toString()));
                 }
-                mSearch.geocode(new GeoCodeOption()
-                        .city(SearchContent.getText().toString())
-                        .address(SearchContent.getText().toString()));
 
 //                if (v.getId() == R.id.reversegeocode) {
 //                    int version  = 0;
@@ -614,6 +679,135 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
+
+
+    ///// -- AR -- ///////
+    /**
+     * 响应周边搜索按钮点击事件
+     *
+     * @param
+     */
+    public void searchNearbyProcess() {
+        // 获取当前的位置信息，然后根据位置信息进行选择
+        if (currentBDLocation != null) {
+            String typeName = currentBDLocation.getLocationDescribe();
+            List poiList = currentBDLocation.getPoiList();
+
+            center = new LatLng(currentBDLocation.getLatitude(), currentBDLocation.getLongitude());
+            //设置请求参数
+
+            PoiNearbySearchOption nearbySearchOption = new PoiNearbySearchOption()
+                    .keyword("餐厅")
+                    .sortType(PoiSortType.distance_from_near_to_far)
+                    .location(center)
+                    .radius(radius)
+                    .pageNum(loadIndex) //分页编号，默认是0页
+                    .pageCapacity(20); //设置每页容量，默认10条
+            mPoiSearch.searchNearby(nearbySearchOption);
+        }
+    }
+
+    @Override
+    public void onGetPoiResult(PoiResult result) {
+        if (result == null || result.error == SearchResult.ERRORNO.RESULT_NOT_FOUND) {
+            Toast.makeText(this, "未找到结果", Toast.LENGTH_LONG)
+                    .show();
+            return;
+        }
+        if (result.error == SearchResult.ERRORNO.NO_ERROR) {
+            poiInfos = new ArrayList<PoiInfoImpl>();
+            for (PoiInfo poi : result.getAllPoi()) {
+                ArPoiInfo poiInfo = new ArPoiInfo();
+                ArLatLng arLatLng = new ArLatLng(poi.location.latitude, poi.location.longitude);
+                poiInfo.name = poi.name;
+                poiInfo.location = arLatLng;
+                PoiInfoImpl poiImpl = new PoiInfoImpl();
+                poiImpl.setPoiInfo(poiInfo);
+                poiInfos.add(poiImpl);
+            }
+            Toast.makeText(this, "查询到: " + poiInfos.size() + " ,个POI点", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, ArActivity.class);
+            MainActivity.this.startActivity(intent);
+            return;
+        }
+        if (result.error == SearchResult.ERRORNO.AMBIGUOUS_KEYWORD) {
+
+            // 当输入关键字在本市没有找到，但在其他城市找到时，返回包含该关键字信息的城市列表
+            String strInfo = "在";
+            for (CityInfo cityInfo : result.getSuggestCityList()) {
+                strInfo += cityInfo.city;
+                strInfo += ",";
+            }
+            strInfo += "找到结果";
+            Toast.makeText(this, strInfo, Toast.LENGTH_LONG)
+                    .show();
+        }
+    }
+
+    @Override
+    public void onGetPoiDetailResult(PoiDetailResult result) {
+        if (result.error != SearchResult.ERRORNO.NO_ERROR) {
+            Toast.makeText(this, "抱歉，未找到结果", Toast.LENGTH_SHORT)
+                    .show();
+        } else {
+            Toast.makeText(this, result.getName() + ": " + result.getAddress(), Toast.LENGTH_SHORT)
+                    .show();
+        }
+    }
+
+    @Override
+    public void onGetPoiDetailResult(PoiDetailSearchResult poiDetailSearchResult) {
+
+    }
+
+    @Override
+    public void onGetPoiIndoorResult(PoiIndoorResult poiIndoorResult) {
+
+    }
+
+    /**
+     * 返回景区数据，跳转到景区Activity
+     * @param arSceneryResponse
+     */
+    @Override
+    public void onGetSceneryResult(ArSceneryResponse arSceneryResponse) {
+        if (arSceneryResponse != null) {
+            if (arSceneryResponse != null && arSceneryResponse.getData() != null
+                    && arSceneryResponse.getData().getSon() != null
+                    && arSceneryResponse.getData().getSon().size() > 0
+                    && arSceneryResponse.getData().getAois() != null
+                    && arSceneryResponse.getData().getAois().size() > 0
+                    && arSceneryResponse.getData().getAois()
+                    .get(0) != null && arSceneryResponse.getData().getAois().get(0).length > 0) {
+                arInfoScenery = arSceneryResponse.getData();
+                arInfoScenery.init();
+                Intent intent = new Intent(MainActivity.this, SceneryArActivity.class);
+                MainActivity.this.startActivity(intent);
+            } else {
+                Toast.makeText(getBaseContext(), "数据出错，请稍后再试", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            Toast.makeText(getBaseContext(), "数据出错，请稍后再试", Toast.LENGTH_LONG).show();
+        }
+
+    }
+
+    /**
+     * 返回楼块数据，跳转到识楼Activity
+     * @param arResponse
+     */
+    @Override
+    public void onGetBuildingResult(ArBuildingResponse arResponse) {
+        if (arResponse != null) {
+            arBuildingResponse = arResponse;
+            Intent intent = new Intent(MainActivity.this, BuildingArActivity.class);
+            MainActivity.this.startActivity(intent);
+        } else {
+            Toast.makeText(getBaseContext(), "数据出错，请稍后再试", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    ///// -- AR -- ///////
 
     /**
      * 获取点击事件

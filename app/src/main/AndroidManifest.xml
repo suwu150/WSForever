@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.jkwu.wsforever">
+
+    <supports-screens
+        android:anyDensity="true"
+        android:largeScreens="true"
+        android:normalScreens="true"
+        android:smallScreens="true" />
     // 定位
     <!-- 这个权限用于进行网络定位 -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -31,6 +37,9 @@
     //使用步行AR导航，配置Camera权限
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- 访问闪光灯 -->
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+
     <application
         android:name=".WSForeverApplication"
         android:allowBackup="true"
@@ -41,13 +50,26 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
-            android:label="地图定位">
+            android:configChanges="orientation"
+            android:label="地图定位"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="sdk.cammer.common.baidu.map.mapcam.ArActivity"
+            android:screenOrientation="portrait" />
+        // 景区Activity
+        <activity
+            android:name="sdk.cammer.common.baidu.map.mapcam.SceneryArActivity"
+            android:screenOrientation="portrait" />
+        // 识楼Activity
+        <activity
+            android:name="sdk.cammer.common.baidu.map.mapcam.BuildingArActivity"
+            android:screenOrientation="portrait" />
 
         <meta-data
             android:name="com.baidu.lbsapi.API_KEY"
@@ -82,6 +104,24 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".activity.RecognitionListenerDialog"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:label="@string/title_activity_recognition_listener_dialog"
+            android:theme="@style/FullscreenTheme" />
+        <activity
+            android:name=".activity.SceneryArActivity"
+            android:label="@string/title_activity_scenery_ar"
+            android:theme="@style/AppTheme" />
+        <activity
+            android:name=".activity.BuildingArActivity"
+            android:label="@string/title_activity_building_ar"
+            android:theme="@style/AppTheme" />
+        <activity android:name=".activity.ArActivity.java" />
+        <activity
+            android:name=".activity.ArActivity"
+            android:label="@string/title_activity_ar"
+            android:theme="@style/AppTheme"></activity>
     </application>
 
 </manifest>

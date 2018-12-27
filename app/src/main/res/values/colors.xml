@@ -3,5 +3,11 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
+
     <color name="transparent">#01000000</color>
+    <color name="black_overlay">#66000000</color>
+    <color name="bdm_color_000000">#000000</color>
+    <color name="bdm_color_ffffff">#ffffff</color>
+    <color name="bdm_color_4cffffff">#4cffffff</color>
+
 </resources>
