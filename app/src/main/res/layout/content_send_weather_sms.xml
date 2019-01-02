@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior"
+    tools:context=".activity.SendWeatherSMS"
+    tools:showIn="@layout/activity_send_weather_sms">
+
+<LinearLayout
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <EditText
+        android:id="@+id/send_sms_phone_number"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:hint="请输入号码"
+        android:textSize="18dp"
+        android:inputType="phone"
+        android:singleLine="true" />
+
+    <EditText
+        android:id="@+id/send_sms_phone_content"
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:hint="请输入内容"
+        android:scrollIndicators="none"
+        android:singleLine="false"
+        android:textSize="18dp"
+        android:textAlignment="textStart" />
+</LinearLayout>
+</android.support.constraint.ConstraintLayout>

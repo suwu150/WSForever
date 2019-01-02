@@ -6,8 +6,8 @@
         android:color="#fff"/>
 
     <padding
-        android:top="10dp"
-        android:bottom="10dp"/>
+        android:top="5dp"
+        android:bottom="5dp"/>
 
     <corners
         android:bottomLeftRadius="10dp"

@@ -10,6 +10,13 @@
     android:layout_centerVertical="true"
     android:orientation="horizontal"
     >
+    <Button
+        android:id="@+id/weather_img_btn"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_centerVertical="true"
+        android:gravity="center"
+        android:background="@drawable/icon_weather_100" />
 
     <Button
         android:id="@+id/user_setting"

@@ -2,26 +2,36 @@ package com.jkwu.wsforever;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -62,16 +72,32 @@ import com.baidu.speech.EventManagerFactory;
 import com.baidu.speech.EventManager;
 import com.baidu.speech.EventListener;
 import com.baidu.speech.asr.SpeechConstant;
+import com.bumptech.glide.Glide;
 import com.jkwu.wsforever.activity.ArActivity;
 import com.jkwu.wsforever.activity.BuildingArActivity;
 import com.jkwu.wsforever.activity.RecognitionListenerDialog;
 import com.jkwu.wsforever.activity.SceneryArActivity;
+import com.jkwu.wsforever.activity.SendWeatherSMS;
+import com.jkwu.wsforever.activity.WeatherActivity;
 import com.jkwu.wsforever.biz.ChangePlanType;
 import com.jkwu.wsforever.biz.RequestLocation;
+import com.jkwu.wsforever.gson.Forecast;
+import com.jkwu.wsforever.gson.Weather;
+import com.jkwu.wsforever.utils.HttpUtil;
+import com.jkwu.wsforever.utils.Utility;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import interfaces.heweather.com.interfacesmodule.bean.basic.Basic;
+import interfaces.heweather.com.interfacesmodule.bean.basic.Update;
+import interfaces.heweather.com.interfacesmodule.bean.weather.forecast.ForecastBase;
+import interfaces.heweather.com.interfacesmodule.bean.weather.hourly.HourlyBase;
+import interfaces.heweather.com.interfacesmodule.bean.weather.lifestyle.LifestyleBase;
+import interfaces.heweather.com.interfacesmodule.bean.weather.now.Now;
+import interfaces.heweather.com.interfacesmodule.bean.weather.now.NowBase;
+import interfaces.heweather.com.interfacesmodule.view.HeWeather;
 import map.baidu.ar.init.ArBuildingResponse;
 import map.baidu.ar.init.ArSceneryResponse;
 import map.baidu.ar.init.ArSdkManager;
@@ -80,6 +106,9 @@ import map.baidu.ar.model.ArInfoScenery;
 import map.baidu.ar.model.ArLatLng;
 import map.baidu.ar.model.ArPoiInfo;
 import map.baidu.ar.model.PoiInfoImpl;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener, OnGetGeoCoderResultListener, OnGetDataResultListener,
         OnGetPoiSearchResultListener {
@@ -124,6 +153,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         int radius = 1000; // 500米半径
         private int loadIndex = 0;
 
+        /////weather///
+        private Button weatherImgBtn;
+        /////weather//////////
+
+        /////use-setting///
+        private Button userSettingBtn;
+        public DrawerLayout drawerUserSettingLayout;
+        /////use-setting//////////
+
+        // left-menu//
+        private TextView sendWeatherSmsTextView;
+        // left-menu//
+
     @Override
         protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -142,6 +184,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         setContentView(R.layout.activity_main);
         checkSelfPermissions();
         initActity();
+        initWeatherImgBtn();
+        initUserSettingBtn();
+        initSendWeatherSmsTextView();
 
         }
 
@@ -189,6 +234,61 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             mArSdkManager.setOnGetDataResultListener(this);
         }
 
+        private void initWeatherImgBtn() {
+            // 初始化各控件
+            weatherImgBtn = (Button) findViewById(R.id.weather_img_btn);
+            HeWeather.getWeatherNow(MainActivity.this, new HeWeather.OnResultWeatherNowBeanListener() {
+
+                @Override
+                public void onError(Throwable throwable) {
+
+                }
+
+                @Override
+                public void onSuccess(List<Now> list) {
+                    Log.d("List", list.toString());
+                    Now nowWeather = list.get(0);
+                    // 设置按钮图标
+                    NowBase nowBase = nowWeather.getNow();
+                    String iconCode = nowBase.getCond_code();
+                    weatherImgBtn.setBackgroundResource(Utility.handleWeatherIcon(iconCode));
+
+                }
+            });
+            weatherImgBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, WeatherActivity.class);
+                startActivity(intent);
+                }
+            });
+        }
+
+        private void initUserSettingBtn() {
+            // 初始化各控件
+            userSettingBtn = (Button) findViewById(R.id.user_setting);
+            drawerUserSettingLayout = (DrawerLayout) findViewById(R.id.drawer_user_setting_layout);
+            userSettingBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    drawerUserSettingLayout.openDrawer(GravityCompat.START);
+                }
+            });
+        }
+
+        // 设置发送信息的监听
+        private void initSendWeatherSmsTextView() {
+            // 初始化各控件
+            sendWeatherSmsTextView = (TextView) findViewById(R.id.send_weather_sms_textView);
+            sendWeatherSmsTextView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(MainActivity.this, SendWeatherSMS.class);
+                    startActivity(intent);
+                }
+            });
+        }
+
         private void checkSelfPermissions() {
             List<String> permissionList = new ArrayList<>();
             if (isGrantedPermission(Manifest.permission.READ_PHONE_STATE)) {
@@ -213,7 +313,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 permissionList.add(Manifest.permission.CAMERA);
             }
 
-            Log.d("WSForver", permissionList.isEmpty() + "");
             if (!permissionList.isEmpty()) {
                 String [] permissions = permissionList.toArray(new String[permissionList.size()]);
                 ActivityCompat.requestPermissions(this, permissions, 1);
@@ -611,7 +710,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mSearch.setOnGetGeoCodeResultListener(this);
     }
 
-
     @Override
     public void onGetGeoCodeResult(GeoCodeResult result) {
         if (result == null || result.error != SearchResult.ERRORNO.NO_ERROR) {
@@ -658,7 +756,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             baiduMap.setMyLocationData(locationData);
         }
         lastX = x;
-
     }
 
     /**
@@ -668,7 +765,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void setTraffic(View view) {
         baiduMap.setTrafficEnabled(((CheckBox) view).isChecked());
     }
-
     /**
      * 设置是否显示百度热力图
      * @param view
@@ -692,10 +788,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if (currentBDLocation != null) {
             String typeName = currentBDLocation.getLocationDescribe();
             List poiList = currentBDLocation.getPoiList();
-
             center = new LatLng(currentBDLocation.getLatitude(), currentBDLocation.getLongitude());
             //设置请求参数
-
             PoiNearbySearchOption nearbySearchOption = new PoiNearbySearchOption()
                     .keyword("餐厅")
                     .sortType(PoiSortType.distance_from_near_to_far)
@@ -710,8 +804,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onGetPoiResult(PoiResult result) {
         if (result == null || result.error == SearchResult.ERRORNO.RESULT_NOT_FOUND) {
-            Toast.makeText(this, "未找到结果", Toast.LENGTH_LONG)
-                    .show();
+            Toast.makeText(this, "未找到结果", Toast.LENGTH_LONG).show();
             return;
         }
         if (result.error == SearchResult.ERRORNO.NO_ERROR) {
@@ -725,13 +818,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 poiImpl.setPoiInfo(poiInfo);
                 poiInfos.add(poiImpl);
             }
-            Toast.makeText(this, "查询到: " + poiInfos.size() + " ,个POI点", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "查询到: " + poiInfos.size() + " ,个关键周边点", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(MainActivity.this, ArActivity.class);
             MainActivity.this.startActivity(intent);
             return;
         }
         if (result.error == SearchResult.ERRORNO.AMBIGUOUS_KEYWORD) {
-
             // 当输入关键字在本市没有找到，但在其他城市找到时，返回包含该关键字信息的城市列表
             String strInfo = "在";
             for (CityInfo cityInfo : result.getSuggestCityList()) {
@@ -747,8 +839,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onGetPoiDetailResult(PoiDetailResult result) {
         if (result.error != SearchResult.ERRORNO.NO_ERROR) {
-            Toast.makeText(this, "抱歉，未找到结果", Toast.LENGTH_SHORT)
-                    .show();
+            Toast.makeText(this, "抱歉，未找到结果", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, result.getName() + ": " + result.getAddress(), Toast.LENGTH_SHORT)
                     .show();
@@ -808,7 +899,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     ///// -- AR -- ///////
-
     /**
      * 获取点击事件
      */
@@ -850,6 +940,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            manager.hideSoftInputFromWindow(token, InputMethodManager.HIDE_NOT_ALWAYS);
 //        }
 //    }
+
 
     public class MyLocationListener extends BDAbstractLocationListener {
             @Override

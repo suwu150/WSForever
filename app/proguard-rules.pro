@@ -25,3 +25,13 @@
 -dontwarn com.baidu.**
 
 -keep class com.baidu.speech.**{*;}
+
+#排除okhttp
+-dontwarn com.squareup.**
+-dontwarn okio.**
+-keep public class org.codehaus.* { *; }
+-keep public class java.nio.* { *; }
+
+#排除HeWeather
+-dontwarn interfaces.heweather.com.interfacesmodule.**
+-keep class interfaces.heweather.com.interfacesmodule.** { *;}
